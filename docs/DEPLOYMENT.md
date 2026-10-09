@@ -104,6 +104,22 @@ Possible deployment environments:
 - Cloud VM
 - Managed cloud services
 
+### Render demo deployment
+
+The repository includes a root-level `Dockerfile` and `render.yaml` Blueprint.
+Connect the repository to Render using **New → Blueprint** and provide
+`SUPABASE_DB_URL`, `SUPABASE_DB_USERNAME`, `SUPABASE_DB_PASSWORD`, and
+`JWT_SECRET` as service environment variables. For Supabase session pooler,
+copy the actual host, port, and username from the Supabase **Connect** panel;
+the JDBC URL follows
+`jdbc:postgresql://<pooler-host>:<port>/postgres?sslmode=require`.
+Render supplies `PORT`, which Spring Boot reads automatically.
+
+Use Supabase for persistent data. Render's free web service filesystem is
+ephemeral and its service may sleep or restart, so the local H2 database is
+only for local development. Free hosting is intended for demos and testing,
+not production.
+
 ---
 
 ## 10. Production Checklist

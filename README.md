@@ -40,6 +40,29 @@ and enter the bootstrap token in the optional field. The first account for that
 email becomes an administrator. Remove both bootstrap variables afterward;
 the account keeps its admin role.
 
+## Deploy on Render
+
+The repository includes a Dockerfile and a Render Blueprint (`render.yaml`).
+For a free demo deployment:
+
+1. Push the application files to GitHub; `.env` is excluded by `.gitignore`
+   and `.dockerignore`.
+2. In the Render dashboard, choose **New → Blueprint**, connect this GitHub
+   repository, and select the `main` branch. Review the service before applying
+   the Blueprint.
+3. Enter `SUPABASE_DB_URL`, `SUPABASE_DB_USERNAME`, `SUPABASE_DB_PASSWORD`,
+   and `JWT_SECRET` when Render prompts for the unsynced variables. For the
+   session pooler, copy its host, port, and username from Supabase's **Connect**
+   panel. The JDBC URL format is
+   `jdbc:postgresql://<pooler-host>:<port>/postgres?sslmode=require`.
+4. Deploy, then open the public `onrender.com` URL from the Render service page.
+
+Render's free web services can sleep when idle, restart, and have an ephemeral
+filesystem. This app therefore needs Supabase configured before deployment;
+do not use its local H2 database for hosted data. The first start runs Flyway
+to create the application tables in Supabase. Free services are suitable for
+demos and testing, not production workloads.
+
 ## Included features
 
 - Password-hashed registration, sign-in, and JWT-authenticated APIs
