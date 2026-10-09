@@ -42,7 +42,7 @@ async function api(path, options = {}) {
   } catch {
     throw new Error("Can't reach the server. Check that the app is running and try again.");
   }
-  if (response.status === 401 && path !== "/api/auth/login" && path !== "/api/auth/register") {
+  if (response.status === 401 && !path.startsWith("/api/auth/") && !path.startsWith("/api/public/")) {
     sessionStorage.removeItem(TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
     render();
@@ -165,11 +165,39 @@ function renderAuth(mode) {
         ${registering ? '<div class="form-field"><label for="auth-admin-token">Admin setup code <span class="muted">(optional)</span></label><input id="auth-admin-token" name="adminBootstrapToken" type="password" autocomplete="off" placeholder="Only provided during admin setup"></div>' : ""}
         <p id="auth-error" class="form-error" role="alert"></p>
         <button class="button full-width" type="submit">${registering ? "Create account" : "Sign in"} <span aria-hidden="true">→</span></button>
+        ${!registering ? '<p class="auth-switch"><button class="text-button" type="button" data-action="forgot-password">Forgot your password?</button></p>' : ""}
         <p class="auth-switch">${registering ? "Already have an account?" : "New to Gather?"}
           <button class="text-button" type="button" data-action="${registering ? "login" : "register"}">${registering ? "Sign in" : "Create an account"}</button>
         </p>
       </form>
     </section>`;
+}
+
+function renderForgotPassword() {
+  root.innerHTML = `
+    <section class="auth-wrap"><div class="auth-aside"><span class="eyebrow">Account recovery</span>
+      <h1>Let’s get you back in.</h1><p>We’ll email a short-lived reset code if an account matches your email.</p></div>
+      <form class="auth-card" id="forgot-form"><h2>Reset your password</h2>
+        <p>Enter the email address on your account.</p>
+        <div class="form-field"><label for="forgot-email">Email address</label><input id="forgot-email" name="email" type="email" autocomplete="email" maxlength="255" required placeholder="you@example.com"></div>
+        <p id="forgot-error" class="form-error" role="alert"></p>
+        <button class="button full-width" type="submit">Send reset code <span aria-hidden="true">→</span></button>
+        <p class="auth-switch"><button class="text-button" type="button" data-action="login">Back to sign in</button></p>
+      </form></section>`;
+}
+
+function renderResetPassword(email) {
+  root.innerHTML = `
+    <section class="auth-wrap"><div class="auth-aside"><span class="eyebrow">Account recovery</span>
+      <h1>Choose a new password.</h1><p>Your reset code is valid for 10 minutes and can only be used once.</p></div>
+      <form class="auth-card" id="reset-form"><h2>Set a new password</h2>
+        <div class="form-field"><label for="reset-email">Email address</label><input id="reset-email" name="email" type="email" autocomplete="email" maxlength="255" required value="${escapeHtml(email)}"></div>
+        <div class="form-field"><label for="reset-code">6-digit reset code</label><input id="reset-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required></div>
+        <div class="form-field"><label for="reset-password">New password</label><input id="reset-password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="72" required placeholder="At least 8 characters"></div>
+        <p id="reset-error" class="form-error" role="alert"></p>
+        <button class="button full-width" type="submit">Update password <span aria-hidden="true">→</span></button>
+        <p class="auth-switch"><button class="text-button" type="button" data-action="login">Back to sign in</button></p>
+      </form></section>`;
 }
 
 async function renderDashboard() {
@@ -500,6 +528,7 @@ document.addEventListener("click", async (event) => {
     switch (action) {
       case "login": renderAuth("login"); break;
       case "register": renderAuth("register"); break;
+      case "forgot-password": renderForgotPassword(); break;
       case "dashboard": navigate("/dashboard"); break;
       case "new-survey": navigate("/builder"); break;
       case "edit-survey": navigate(`/builder/${id}`); break;
@@ -616,7 +645,46 @@ document.addEventListener("submit", async (event) => {
       history.replaceState({}, "", "/dashboard");
       updateNavigation();
       await renderDashboard();
-      notify(registering ? "Welcome to Gather. Your account is ready." : `Welcome back, ${result.user.name.split(/\s+/)[0]}.`);
+      notify(registering
+        ? (result.emailSent ? "Welcome to Gather. Your account is ready." : "Account created, but the welcome email couldn't be sent. Check the SMTP settings.")
+        : `Welcome back, ${result.user.name.split(/\s+/)[0]}.`);
+    } catch (error) {
+      errorBox.textContent = error.message;
+      submit.disabled = false;
+    }
+  }
+  if (event.target.id === "forgot-form") {
+    const form = event.target;
+    const submit = form.querySelector('[type="submit"]');
+    const errorBox = form.querySelector("#forgot-error");
+    const email = new FormData(form).get("email").trim();
+    submit.disabled = true;
+    errorBox.textContent = "";
+    try {
+      const result = await api("/api/auth/forgot-password", {
+        method: "POST", body: JSON.stringify({ email }),
+      });
+      renderResetPassword(email);
+      notify(result.message);
+    } catch (error) {
+      errorBox.textContent = error.message;
+      submit.disabled = false;
+    }
+  }
+  if (event.target.id === "reset-form") {
+    const form = event.target;
+    const submit = form.querySelector('[type="submit"]');
+    const errorBox = form.querySelector("#reset-error");
+    submit.disabled = true;
+    errorBox.textContent = "";
+    const payload = Object.fromEntries(new FormData(form).entries());
+    try {
+      const result = await api("/api/auth/reset-password", {
+        method: "POST", body: JSON.stringify(payload),
+      });
+      renderAuth("login");
+      document.getElementById("auth-email").value = payload.email;
+      notify(result.message);
     } catch (error) {
       errorBox.textContent = error.message;
       submit.disabled = false;

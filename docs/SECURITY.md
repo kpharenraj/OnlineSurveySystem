@@ -55,6 +55,12 @@ Password Hash
 Database
 ```
 
+Password recovery uses a cryptographically random six-digit code. Only its
+BCrypt hash is stored; codes expire after 10 minutes, are single-use, and allow
+up to five verification attempts. Requests are limited to one per email per
+minute, and the request endpoint does not reveal whether an email is registered.
+SMTP credentials must be kept in environment variables and never committed.
+
 ---
 
 ## 3. Authorization
@@ -163,7 +169,6 @@ Potential improvements:
 - Duplicate response detection
 - Account lockout
 - Email verification
-- Password reset
 - Audit logs
 - Advanced moderation
 
@@ -176,6 +181,7 @@ Potential improvements:
  - Ownership validation
  - Input validation
  - SQL injection protection
+ - Hashed, expiring, single-use password-reset codes
  - CORS configuration
  - Secret management
  - Safe error handling

@@ -57,6 +57,12 @@ without a Supabase account. To use Supabase, set the three database environment
 variables above. Set `JWT_SECRET` to a private value of at least 32 bytes for
 deployments. Never commit `.env` or share its credentials.
 
+Email delivery is optional for local development. To enable welcome messages
+and password recovery, set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`,
+`SMTP_USERNAME`, `SMTP_PASSWORD`, and `MAIL_FROM`. Use a Gmail App Password
+generated after enabling 2-Step Verification, not your regular Google password.
+Remove spaces if Google displays the App Password in groups.
+
 ---
 
 ## 5. Run Application

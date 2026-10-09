@@ -1,15 +1,21 @@
 package com.surveysystem;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -22,6 +28,8 @@ import org.springframework.http.ResponseEntity;
         properties = {
             "spring.datasource.url=jdbc:h2:mem:surveytest;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
             "spring.datasource.username=sa",
+            "spring.mail.host=smtp.example.test",
+            "app.mail.from=noreply@example.test",
             "spring.datasource.password=",
             "app.jwt.secret=test-secret-that-is-at-least-thirty-two-bytes-long"
         })
@@ -31,6 +39,9 @@ class SurveyApplicationIntegrationTest {
 
     @Autowired
     private TestRestTemplate rest;
+
+    @MockitoBean
+    private JavaMailSender mailSender;
 
     @Test
     void ownerCanPublishCollectAndAnalyzeResponses() {
@@ -104,6 +115,66 @@ class SurveyApplicationIntegrationTest {
     void homepageAndStaticAssetsAreServed() {
         assertThat(get("/", null, String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(get("/app.js", null, String.class).getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void registrationSendsWelcomeEmailAndResetCodeCanOnlyBeUsedOnce() {
+        String email = "recovery-" + UUID.randomUUID() + "@example.com";
+        Map<?, ?> account = post("/api/auth/register",
+                Map.of("name", "Recovery User", "email", email, "password", "Password123!"),
+                null, Map.class).getBody();
+        assertThat(account.get("emailSent")).isEqualTo(true);
+
+        ResponseEntity<Map> unknownEmail = post("/api/auth/forgot-password",
+                Map.of("email", "missing-" + UUID.randomUUID() + "@example.com"), null, Map.class);
+        ResponseEntity<Map> existingEmail = post("/api/auth/forgot-password",
+                Map.of("email", email), null, Map.class);
+        assertThat(unknownEmail.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(unknownEmail.getBody().get("message")).isEqualTo(existingEmail.getBody().get("message"));
+
+        ArgumentCaptor<SimpleMailMessage> message = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, times(2)).send(message.capture());
+        String resetCode = message.getAllValues().get(1).getText()
+                .replaceAll("(?s).*one-time code is: (\\d{6}).*", "$1");
+        assertThat(resetCode).matches("\\d{6}");
+
+        ResponseEntity<Map> invalidCode = post("/api/auth/reset-password",
+                Map.of("email", email, "code", "000000", "password", "NewPassword123!"), null, Map.class);
+        assertThat(invalidCode.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+
+        ResponseEntity<Map> reset = post("/api/auth/reset-password",
+                Map.of("email", email, "code", resetCode, "password", "NewPassword123!"), null, Map.class);
+        assertThat(reset.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(post("/api/auth/reset-password",
+                Map.of("email", email, "code", resetCode, "password", "AnotherPassword123!"), null, Map.class)
+                .getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(post("/api/auth/login",
+                Map.of("email", email, "password", "NewPassword123!"), null, Map.class).getStatusCode())
+                .isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void passwordResetLimitsCodeAttemptsAndResends() {
+        String email = "attempts-" + UUID.randomUUID() + "@example.com";
+        post("/api/auth/register",
+                Map.of("name", "Attempt User", "email", email, "password", "Password123!"),
+                null, Map.class);
+        post("/api/auth/forgot-password", Map.of("email", email), null, Map.class);
+        post("/api/auth/forgot-password", Map.of("email", email), null, Map.class);
+
+        ArgumentCaptor<SimpleMailMessage> message = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(mailSender, times(2)).send(message.capture());
+        String code = message.getAllValues().get(1).getText()
+                .replaceAll("(?s).*one-time code is: (\\d{6}).*", "$1");
+        String wrongCode = code.equals("000000") ? "000001" : "000000";
+        for (int attempt = 0; attempt < 5; attempt++) {
+            assertThat(post("/api/auth/reset-password",
+                    Map.of("email", email, "code", wrongCode, "password", "NewPassword123!"),
+                    null, Map.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+        assertThat(post("/api/auth/reset-password",
+                Map.of("email", email, "code", code, "password", "NewPassword123!"),
+                null, Map.class).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     private <T> ResponseEntity<T> post(String path, Object body, String token, Class<T> responseType) {

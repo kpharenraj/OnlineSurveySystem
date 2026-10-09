@@ -109,7 +109,11 @@ Possible deployment environments:
 The repository includes a root-level `Dockerfile` and `render.yaml` Blueprint.
 Connect the repository to Render using **New → Blueprint** and provide
 `SUPABASE_DB_URL`, `SUPABASE_DB_USERNAME`, `SUPABASE_DB_PASSWORD`, and
-`JWT_SECRET` as service environment variables. For Supabase session pooler,
+`JWT_SECRET` as service environment variables. To enable registration welcome
+emails and password recovery, also set `SMTP_USERNAME`, `SMTP_PASSWORD`, and
+`MAIL_FROM`; the app defaults `SMTP_HOST` to `smtp.gmail.com` and `SMTP_PORT` to
+`587`. Use a Gmail App Password (with 2-Step Verification enabled), never your
+regular Google password. For Supabase session pooler,
 copy the actual host, port, and username from the Supabase **Connect** panel;
 the JDBC URL follows
 `jdbc:postgresql://<pooler-host>:<port>/postgres?sslmode=require`.

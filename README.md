@@ -32,6 +32,19 @@ To use Supabase instead:
 Spring Boot reads the root `.env` file when the app starts. The file is ignored
 by Git; never commit or share real database credentials or a JWT secret.
 
+### Email and password recovery
+
+The app can run without email settings, but registration welcome emails and
+password recovery require Gmail SMTP. In Google Account security settings,
+enable 2-Step Verification and create an **App Password** for this app; use that
+16-character App Password, not your normal Google password; remove any display
+spaces if Google groups the characters.
+
+Set `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USERNAME` to your Gmail
+address, `SMTP_PASSWORD` to the App Password, and `MAIL_FROM` to that same Gmail
+address in `.env`. Keep these secrets private. Password-reset codes expire after
+10 minutes, are single-use, and can be requested at most once per minute.
+
 ### First administrator
 
 For an optional admin account, set `ADMIN_EMAIL` and a private
@@ -51,7 +64,9 @@ For a free demo deployment:
    repository, and select the `main` branch. Review the service before applying
    the Blueprint.
 3. Enter `SUPABASE_DB_URL`, `SUPABASE_DB_USERNAME`, `SUPABASE_DB_PASSWORD`,
-   and `JWT_SECRET` when Render prompts for the unsynced variables. For the
+   `JWT_SECRET`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and `MAIL_FROM` in Render's
+   environment settings. Set `SMTP_HOST` to `smtp.gmail.com` and `SMTP_PORT` to
+   `587`. Use the Gmail App Password, not your normal Google password. For the
    session pooler, copy its host, port, and username from Supabase's **Connect**
    panel. The JDBC URL format is
    `jdbc:postgresql://<pooler-host>:<port>/postgres?sslmode=require`.

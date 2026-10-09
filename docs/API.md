@@ -23,6 +23,8 @@ Request:
   "password": "Password123!"
 }
 ```
+Successful registration returns the authenticated session and an `emailSent`
+boolean indicating whether the welcome email was delivered.
 ---
 ### Login
 ```http
@@ -40,6 +42,33 @@ Response:
   }
 }
 ```
+---
+### Request a password-reset code
+```http
+POST /api/auth/forgot-password
+Content-Type: application/json
+```
+Request:
+```json
+{ "email": "you@example.com" }
+```
+The response is intentionally the same whether or not the address has an
+account:
+```json
+{ "message": "If an account exists for that email, a reset code has been sent." }
+```
+
+### Reset a password
+```http
+POST /api/auth/reset-password
+Content-Type: application/json
+```
+Request:
+```json
+{ "email": "you@example.com", "code": "123456", "password": "NewPassword123!" }
+```
+Codes expire after 10 minutes, can only be used once, and allow at most five
+verification attempts. A new code can be requested once per minute.
 
 ---
 
@@ -232,4 +261,3 @@ Status	Meaning
 ```
 
 ---
-
