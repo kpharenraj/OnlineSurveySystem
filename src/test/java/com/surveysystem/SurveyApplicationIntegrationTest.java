@@ -63,6 +63,9 @@ class SurveyApplicationIntegrationTest {
 
         Map<?, ?> published = post("/api/surveys/" + surveyId + "/publish", Map.of(), token, Map.class).getBody();
         String publicToken = published.get("publicToken").toString();
+        ResponseEntity<String> publicPage = get("/survey/" + publicToken, null, String.class);
+        assertThat(publicPage.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(publicPage.getBody()).contains("<main id=\"app\"");
         assertThat(get("/api/public/surveys/" + publicToken, null, Map.class).getStatusCode()).isEqualTo(HttpStatus.OK);
 
         ResponseEntity<Map> invalid = post("/api/public/surveys/" + publicToken + "/responses",
